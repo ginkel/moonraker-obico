@@ -134,6 +134,8 @@ class MoonrakerConn:
 
     def update_webcam_config_from_moonraker(self):
         def webcam_config_in_moonraker():
+            return []
+
             # TODO: Rotation is not handled correctly
 
             # Check for the webcam API in the newer Moonraker versions
