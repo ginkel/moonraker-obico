@@ -58,6 +58,7 @@ class WebcamStreamer:
 
     @backoff.on_exception(backoff.expo, Exception)
     def mjpeg_loop(self):
+        min_interval_btw_frames = 1.0 / self.config.webcam.get_target_fps(fallback_fps=3)
         bandwidth_throttle = 0.004
 
         self.mjpeg_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -72,7 +73,8 @@ class WebcamStreamer:
                 time.sleep(1)
                 continue
 
-            time.sleep( max(last_frame_sent+0.5-time.time(), 0) )  # No more than 1 frame per 0.5 second
+            time.sleep( max(last_frame_sent + min_interval_btw_frames - time.time(), 0) )
+            last_frame_sent = time.time()
 
             jpg = None
             try:
@@ -88,8 +90,6 @@ class WebcamStreamer:
             for chunk in [encoded[i:i+1400] for i in range(0, len(encoded), 1400)]:
                 self.mjpeg_sock.sendto(chunk, (JANUS_SERVER, JANUS_MJPEG_DATA_PORT))
                 time.sleep(bandwidth_throttle)
-
-        last_frame_sent = time.time()
 
     def video_pipeline(self):
         if not pi_version():
@@ -165,7 +165,7 @@ class WebcamStreamer:
             _logger.warn(f'Failed to detect webcam resolution due to unexpected error. Using default.')
 
         bitrate = bitrate_for_dim(img_w, img_h)
-        fps = webcam_config.target_fps
+        fps = webcam_config.get_target_fps(fallback_fps=25)
         if not self.app_model.linked_printer.get('is_pro'):
             fps = min(8, fps) # For some reason, when fps is set to 5, it looks like 2FPS. 8fps looks more like 5
             bitrate = int(bitrate/2)
